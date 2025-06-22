@@ -1,6 +1,7 @@
-import streamlit as st
+""import streamlit as st
 import openai
 import os
+from openai import OpenAI
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="MedBot Assistant", page_icon="💊")
@@ -9,7 +10,7 @@ st.title("💬 MedBot – Your Health Assistant")
 # --- User inputs API key manually ---
 openai_api_key = st.text_input("Enter your OpenAI API Key", type="password")
 if openai_api_key:
-    openai.api_key = openai_api_key
+    client = OpenAI(api_key=openai_api_key)
     st.success("✅ API Key Loaded")
 else:
     st.warning("Please enter your OpenAI API Key to continue")
@@ -45,13 +46,13 @@ if openai_api_key:
         st.session_state.messages.append({"role": "user", "content": user_input})
         st.chat_message("user").markdown(user_input)
 
-        # Call OpenAI API
+        # Call OpenAI API (v1.0+)
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=st.session_state.messages
             )
-            bot_reply = response["choices"][0]["message"]["content"]
+            bot_reply = response.choices[0].message.content
         except Exception as e:
             bot_reply = "❌ Error: " + str(e)
 
