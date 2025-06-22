@@ -2,9 +2,19 @@ import streamlit as st
 import openai
 import os
 
-#  Set your OpenAI API key ---
-openai.api_key = os.getenv("OPENAI_API_KEY")  
+# --- Streamlit UI ---
+st.set_page_config(page_title="MedBot Assistant", page_icon="💊")
+st.title("💬 MedBot – Your Health Assistant")
 
+# --- User inputs API key manually ---
+openai_api_key = st.text_input("Enter your OpenAI API Key", type="password")
+if openai_api_key:
+    openai.api_key = openai_api_key
+    st.success("✅ API Key Loaded")
+else:
+    st.warning("Please enter your OpenAI API Key to continue")
+
+# --- Set a custom system prompt ---
 system_prompt = """
 You are a friendly and intelligent in-app assistant named MedBot.
 You help users:
@@ -14,48 +24,46 @@ You help users:
 Always be concise, polite, and use emojis where helpful.
 """
 
-# Initialize Streamlit ---
-st.set_page_config(page_title="MedBot Assistant", page_icon="💊")
-st.title("💬 MedBot – Your Health Assistant")
+# --- Initialize Chat if API key is present ---
+if openai_api_key:
+    # Session state to store chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "system", "content": system_prompt}
+        ]
 
-# Session state to store chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": system_prompt}
-    ]
+    # Display previous messages
+    for msg in st.session_state.messages[1:]:
+        if msg["role"] == "user":
+            st.chat_message("user").markdown(msg["content"])
+        else:
+            st.chat_message("assistant").markdown(msg["content"])
 
-# Display previous messages
-for msg in st.session_state.messages[1:]:
-    if msg["role"] == "user":
-        st.chat_message("user").markdown(msg["content"])
-    else:
-        st.chat_message("assistant").markdown(msg["content"])
+    # Chat input box
+    user_input = st.chat_input("Ask MedBot anything...")
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        st.chat_message("user").markdown(user_input)
 
-# Chat input box
-user_input = st.chat_input("Ask MedBot anything...")
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    st.chat_message("user").markdown(user_input)
+        # Call OpenAI API
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=st.session_state.messages
+            )
+            bot_reply = response["choices"][0]["message"]["content"]
+        except Exception as e:
+            bot_reply = "❌ Error: " + str(e)
 
-    # Call OpenAI API
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # or "gpt-3.5-turbo" if needed
-            messages=st.session_state.messages
-        )
-        bot_reply = response["choices"][0]["message"]["content"]
-    except Exception as e:
-        bot_reply = "❌ Error: " + str(e)
+        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+        st.chat_message("assistant").markdown(bot_reply)
 
-    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-    st.chat_message("assistant").markdown(bot_reply)
-
-# --- Optional: Reminders & Logging (simulated for now) ---
-with st.expander("📝 Simulate Meal Logging or Reminders"):
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Log Meal 🍱"):
-            st.success("Meal logged successfully at this time.")
-    with col2:
-        if st.button("Set Med Reminder ⏰"):
-            st.info("Reminder set for 8PM. We'll notify you then!")
+    # Optional: Simulate Meal Logging or Reminders
+    with st.expander("📝 Simulate Meal Logging or Reminders"):
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Log Meal 🍱"):
+                st.success("Meal logged successfully at this time.")
+        with col2:
+            if st.button("Set Med Reminder ⏰"):
+                st.info("Reminder set for 8PM. We'll notify you then!")
