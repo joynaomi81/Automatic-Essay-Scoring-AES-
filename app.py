@@ -1,25 +1,12 @@
-# clinical_chatbot.py
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
-import streamlit as st
-from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
+tokenizer = AutoTokenizer.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
+model = AutoModelForQuestionAnswering.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
 
-# Load ClinicalBERT
-@st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
-    model = AutoModelForMaskedLM.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
-    return pipeline("fill-mask", model=model, tokenizer=tokenizer)
+qa_pipeline = pipeline("question-answering", model=model, tokenizer=tokenizer)
 
-qa_pipeline = load_model()
+context = "Malaria is caused by parasites that are transmitted to people through the bites of infected female Anopheles mosquitoes."
+question = "What causes malaria?"
 
-# UI
-st.title("🩺 ClinicalBERT Health Assistant")
-st.write("Ask health-related questions. E.g., 'Metformin may cause [MASK].'")
-
-user_input = st.text_input("Enter a sentence with [MASK] to predict:")
-
-if user_input:
-    with st.spinner("Thinking..."):
-        results = qa_pipeline(user_input, top_k=3)
-        for r in results:
-            st.success(f"Prediction: {r['sequence']} (Score: {r['score']:.4f})")
+result = qa_pipeline(question=question, context=context)
+print(result['answer'])  # Output: "parasites"
