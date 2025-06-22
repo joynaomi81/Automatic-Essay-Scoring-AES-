@@ -1,49 +1,43 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
-# Set page config
-st.set_page_config(page_title="🩺 ClinicalBERT Health Q&A")
+st.set_page_config(page_title="🦙 LLaMA-3 Health Chat")
 
-# Load ClinicalBERT QA pipeline
+# Load LLaMA-3 8B (this will be slow unless you have good hardware or use quantization)
 @st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
-    model = AutoModelForQuestionAnswering.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
-    return pipeline("question-answering", model=model, tokenizer=tokenizer)
+def load_llama3():
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B", trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        "meta-llama/Meta-Llama-3-8B",
+        torch_dtype=torch.float16,
+        device_map="auto",
+        trust_remote_code=True
+    )
+    return tokenizer, model
 
-qa_pipeline = load_model()
+tokenizer, model = load_llama3()
 
-# Richer context: multiple conditions, causes, symptoms, treatments
-context = """
-Ulcers are sores on the lining of the stomach or small intestine. They are commonly caused by Helicobacter pylori infection or overuse of NSAIDs.
-Symptoms include burning stomach pain, bloating, and nausea. Treatment includes antibiotics and acid-reducing medications.
+# Function to generate response
+def generate_answer(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=200,
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+    return tokenizer.decode(outputs[0], skip_special_tokens=True).replace(prompt, "").strip()
 
-Malaria is a mosquito-borne disease caused by Plasmodium parasites. Symptoms include fever, chills, sweating, and vomiting.
-It is treated with antimalarial drugs like chloroquine or artemisinin-based therapies.
+# UI
+st.title("🦙 LLaMA-3 Medical Q&A")
+st.write("Ask any health-related question and get answers from Meta’s LLaMA-3 model.")
 
-Diabetes is a chronic condition affecting insulin production or use. Symptoms include frequent urination, thirst, fatigue, and blurred vision.
-Treatment includes insulin therapy, lifestyle changes, and oral medications.
+user_input = st.text_input("Ask your question:")
 
-High blood pressure, or hypertension, is when the force of blood against artery walls is too high. It can lead to heart disease and stroke.
-It is often treated with lifestyle modifications and antihypertensive drugs.
-
-Asthma is a respiratory condition where airways become inflamed and narrowed. Triggers include allergens, cold air, and exercise.
-Symptoms include wheezing, shortness of breath, and coughing. Treatment includes inhalers and corticosteroids.
-
-Cancer is a group of diseases involving abnormal cell growth. Causes vary but include genetic factors, carcinogens, and lifestyle.
-Treatment may involve surgery, chemotherapy, radiation, or immunotherapy.
-"""
-
-# Streamlit UI
-st.title("🩺 ClinicalBERT Medical Q&A")
-st.markdown("Ask any health-related question. This assistant will answer using biomedical knowledge.")
-
-question = st.text_input("Your medical question:")
-
-if question:
-    with st.spinner("Finding the answer..."):
-        try:
-            result = qa_pipeline(question=question, context=context)
-            st.success(f"**Answer:** {result['answer']}")
-        except Exception as e:
-            st.error("Sorry, I couldn't answer that. Try a simpler or clearer question.")
+if user_input:
+    with st.spinner("Generating answer..."):
+        response = generate_answer(f"Q: {user_input}\nA:")
+        st.success(f"**Answer:** {response}")
