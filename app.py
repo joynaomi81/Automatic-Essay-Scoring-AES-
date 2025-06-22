@@ -1,41 +1,49 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
-# Set Streamlit page settings
-st.set_page_config(page_title="🩺 Health Q&A Assistant")
+# Set page config
+st.set_page_config(page_title="🩺 ClinicalBERT Health Q&A")
 
-# Load GPT-2 model and tokenizer
+# Load ClinicalBERT QA pipeline
 @st.cache_resource
 def load_model():
-    tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
-    model = AutoModelForCausalLM.from_pretrained("openai-community/gpt2")
-    return tokenizer, model
+    tokenizer = AutoTokenizer.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
+    model = AutoModelForQuestionAnswering.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
+    return pipeline("question-answering", model=model, tokenizer=tokenizer)
 
-tokenizer, model = load_model()
+qa_pipeline = load_model()
 
-# Function to generate answer from GPT-2
-def generate_answer(question):
-    prompt = f"Answer this health question: {question}\nAnswer:"
-    inputs = tokenizer(prompt, return_tensors="pt")
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=100,
-        temperature=0.7,
-        top_k=50,
-        top_p=0.9,
-        pad_token_id=tokenizer.eos_token_id,
-    )
-    generated = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return generated.replace(prompt, "").strip()
+# Richer context: multiple conditions, causes, symptoms, treatments
+context = """
+Ulcers are sores on the lining of the stomach or small intestine. They are commonly caused by Helicobacter pylori infection or overuse of NSAIDs.
+Symptoms include burning stomach pain, bloating, and nausea. Treatment includes antibiotics and acid-reducing medications.
+
+Malaria is a mosquito-borne disease caused by Plasmodium parasites. Symptoms include fever, chills, sweating, and vomiting.
+It is treated with antimalarial drugs like chloroquine or artemisinin-based therapies.
+
+Diabetes is a chronic condition affecting insulin production or use. Symptoms include frequent urination, thirst, fatigue, and blurred vision.
+Treatment includes insulin therapy, lifestyle changes, and oral medications.
+
+High blood pressure, or hypertension, is when the force of blood against artery walls is too high. It can lead to heart disease and stroke.
+It is often treated with lifestyle modifications and antihypertensive drugs.
+
+Asthma is a respiratory condition where airways become inflamed and narrowed. Triggers include allergens, cold air, and exercise.
+Symptoms include wheezing, shortness of breath, and coughing. Treatment includes inhalers and corticosteroids.
+
+Cancer is a group of diseases involving abnormal cell growth. Causes vary but include genetic factors, carcinogens, and lifestyle.
+Treatment may involve surgery, chemotherapy, radiation, or immunotherapy.
+"""
 
 # Streamlit UI
-st.title("🩺 Health Q&A Assistant")
-st.write("Ask me any health-related question and I’ll try my best to answer it.")
+st.title("🩺 ClinicalBERT Medical Q&A")
+st.markdown("Ask any health-related question. This assistant will answer using biomedical knowledge.")
 
-user_question = st.text_input("Your question:")
+question = st.text_input("Your medical question:")
 
-if user_question:
-    with st.spinner("Thinking..."):
-        answer = generate_answer(user_question)
-        st.success(f"**Answer:** {answer}")
+if question:
+    with st.spinner("Finding the answer..."):
+        try:
+            result = qa_pipeline(question=question, context=context)
+            st.success(f"**Answer:** {result['answer']}")
+        except Exception as e:
+            st.error("Sorry, I couldn't answer that. Try a simpler or clearer question.")
