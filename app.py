@@ -1,43 +1,37 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+import openai
+import os
 
-# Set up the Streamlit page
-st.set_page_config(page_title="🩺 Ask Me Anything - ClinicalBERT")
+# Page config
+st.set_page_config(page_title="🧠 Medical Q&A Assistant")
 
-# Load the ClinicalBERT model
-@st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
-    model = AutoModelForQuestionAnswering.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
-    return pipeline("question-answering", model=model, tokenizer=tokenizer)
+# Input your OpenAI API key
+openai_api_key = st.secrets.get("OPENAI_API_KEY") or st.text_input("🔑 Enter your OpenAI API Key", type="password")
 
-qa_pipeline = load_model()
+# Only proceed if key is entered
+if openai_api_key:
+    openai.api_key = openai_api_key
 
-# Built-in general medical knowledge context
-context = """
-Ulcers are open sores on the lining of the stomach or small intestine. They are caused by Helicobacter pylori infection or overuse of NSAIDs. 
-Malaria is caused by Plasmodium parasites and spread through mosquito bites. It is treated with antimalarial medications.
-High blood pressure, or hypertension, increases the risk of heart disease and stroke. It is managed with lifestyle changes and medication.
-Asthma is a chronic condition that affects the airways, leading to wheezing and difficulty breathing.
-Diabetes is a disease that affects how the body uses blood sugar and is managed with insulin, oral medications, and diet.
-Typhoid fever is caused by Salmonella typhi and is treated with antibiotics.
-Preventing ulcers involves avoiding NSAIDs, treating infections, managing stress, and eating healthily.
-"""
+    st.title("🩺 Ask a Medical Question")
+    st.write("Ask me anything related to health and medicine!")
 
-# Streamlit UI
-st.title("🩺 Ask Me Anything (ClinicalBERT)")
-st.write("Ask a health-related question. The model will answer using trusted medical knowledge.")
+    user_question = st.text_input("💬 What would you like to know?")
 
-question = st.text_input("💬 Ask your medical question:")
-
-if question:
-    with st.spinner("Thinking..."):
-        try:
-            result = qa_pipeline(question=question, context=context)
-            answer = result.get("answer", "").strip()
-            if answer:
-                st.success(f"**Answer:** {answer}")
-            else:
-                st.warning("I couldn't find an exact answer. Try rephrasing your question.")
-        except Exception as e:
-            st.error(f"⚠️ Error: {str(e)}")
+    if user_question:
+        with st.spinner("Thinking..."):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",  # or "gpt-4" if you have access
+                    messages=[
+                        {"role": "system", "content": "You are a helpful and medically knowledgeable assistant. Always explain in simple terms, but avoid giving medical advice. Stick to facts."},
+                        {"role": "user", "content": user_question}
+                    ],
+                    temperature=0.5,
+                    max_tokens=300
+                )
+                answer = response["choices"][0]["message"]["content"].strip()
+                st.success(answer)
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+else:
+    st.info("Please enter your OpenAI API key to begin.")
