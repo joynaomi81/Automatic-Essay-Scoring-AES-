@@ -1,7 +1,10 @@
 import streamlit as st
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+import datetime
 
-# Load BioBERT QA model
+st.set_page_config(page_title="My Health Assistant", page_icon="🩺")
+
+# Load BioBERT QA Model
 @st.cache_resource
 def load_biobert_qa():
     tokenizer = AutoTokenizer.from_pretrained("ktrapeznikov/biobert_v1.1_pubmed_squad_v2")
@@ -10,39 +13,89 @@ def load_biobert_qa():
 
 qa_pipeline = load_biobert_qa()
 
-# Fixed context for now (can be replaced with full knowledge base)
+# Static context (can be replaced with medical DB)
 context = """
-Malaria is caused by Plasmodium parasites. The parasites are spread to people through the bites of infected female Anopheles mosquitoes.
-Symptoms include fever, chills, and flu-like illness. Without treatment, it can lead to severe complications and death.
-Treatment typically involves antimalarial medications.
+Ulcers are open sores that develop on the inside lining of your stomach and the upper portion of your small intestine.
+The most common cause of ulcers is infection with the bacterium Helicobacter pylori (H. pylori) and long-term use of NSAIDs.
+Malaria is caused by Plasmodium parasites. Symptoms include fever, chills, and flu-like illness.
+Treatment involves antimalarial medications.
 """
 
-st.title("🩺 BioBERT Medical Assistant")
-st.markdown("Ask any **medical question** (e.g., 'What causes malaria?')")
+# Initial session state
+if "meals" not in st.session_state:
+    st.session_state.meals = []
 
-# Initialize chat history
+if "reminder_time" not in st.session_state:
+    st.session_state.reminder_time = None
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# App UI
+st.title("🩺 My Health Assistant")
+st.markdown("Hello! I'm your health buddy 😊 How can I help you today?")
 
-# Input box
-if question := st.chat_input("Type your health question here..."):
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
+# Feature Selection
+option = st.selectbox(
+    "What would you like to do?",
+    [
+        "Ask a medical question",
+        "Log my meal",
+        "Remind me about meds",
+        "Help me use the app"
+    ]
+)
 
-    with st.chat_message("assistant"):
+# 1️⃣ Ask a Question → BioBERT
+if option == "Ask a medical question":
+    question = st.text_input("Ask your question (e.g., What causes ulcer?)")
+    if question:
         with st.spinner("Thinking..."):
             try:
                 result = qa_pipeline(question=question, context=context)
-                answer = result['answer']
-                st.markdown(f"**Answer:** {answer}")
-            except Exception as e:
-                answer = "Sorry, I couldn't find an answer to that."
-                st.error(answer)
+                st.success(f"**Answer:** {result['answer']}")
+            except:
+                st.error("Sorry, I couldn't find an answer.")
 
-        st.session_state.messages.append({"role": "assistant", "content": f"**Answer:** {answer}"})
+# 2️⃣ Log My Meal
+elif option == "Log my meal":
+    meal = st.selectbox("Which meal are you logging?", ["Breakfast", "Lunch", "Dinner"])
+    note = st.text_input("Add a note (optional):")
+    if st.button("Log Meal"):
+        entry = {
+            "meal": meal,
+            "note": note,
+            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+        st.session_state.meals.append(entry)
+        st.success(f"{meal} logged!")
+
+    if st.session_state.meals:
+        st.markdown("### 🍽️ Your Meal Logs:")
+        for m in st.session_state.meals:
+            st.markdown(f"- **{m['meal']}** at {m['time']} — {m['note']}")
+
+# 3️⃣ Med Reminder
+elif option == "Remind me about meds":
+    reminder_time = st.time_input("Set medication time")
+    if st.button("Set Reminder"):
+        st.session_state.reminder_time = reminder_time
+        st.success(f"⏰ Reminder set for {reminder_time}.")
+
+    # Check reminder
+    now = datetime.datetime.now().time()
+    if st.session_state.reminder_time and now >= st.session_state.reminder_time:
+        st.warning("⏰ Time to take your meds!")
+        # Reset reminder
+        st.session_state.reminder_time = None
+
+# 4️⃣ Help Navigate App
+elif option == "Help me use the app":
+    st.markdown("🗺️ **App Help Guide**")
+    st.markdown("""
+    - **Ask a medical question** → Get answers using BioBERT model trained on biomedical texts.
+    - **Log my meal** → Save logs of what you ate and when.
+    - **Remind me about meds** → Set a time to be reminded.
+    - **Help me use the app** → You're here! 😄
+    """)
+
