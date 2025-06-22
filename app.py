@@ -1,10 +1,11 @@
-#import streamlit as st
+import streamlit as st
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+# Set Streamlit page settings
 st.set_page_config(page_title="🩺 Health Q&A Assistant")
 
-# Load GPT-2
+# Load GPT-2 model and tokenizer
 @st.cache_resource
 def load_model():
     tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
@@ -13,7 +14,7 @@ def load_model():
 
 tokenizer, model = load_model()
 
-# Function to generate response
+# Function to generate answer from GPT-2
 def generate_answer(question):
     prompt = f"Answer this health question: {question}\nAnswer:"
     inputs = tokenizer(prompt, return_tensors="pt")
@@ -28,9 +29,9 @@ def generate_answer(question):
     generated = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated.replace(prompt, "").strip()
 
-# UI
+# Streamlit UI
 st.title("🩺 Health Q&A Assistant")
-st.write("Ask me any health-related question and I'll try my best to answer.")
+st.write("Ask me any health-related question and I’ll try my best to answer it.")
 
 user_question = st.text_input("Your question:")
 
