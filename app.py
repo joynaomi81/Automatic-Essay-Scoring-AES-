@@ -1,7 +1,7 @@
 import streamlit as st
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 
-# Set page config
+# Set up the app
 st.set_page_config(page_title="🩺 FLAN-T5 Health Chatbot")
 
 # Load FLAN-T5 model
@@ -13,9 +13,9 @@ def load_model():
 
 qa_pipeline = load_model()
 
-# Streamlit UI
+# UI
 st.title("🩺 Ask Me Anything: FLAN-T5 Health Assistant")
-st.write("Ask any health-related question below, and I'll do my best to help.")
+st.write("Ask any health-related question:")
 
 user_question = st.text_input("💬 Your medical question:")
 
